@@ -1,0 +1,11 @@
+#/bin/bash
+
+if [ $# -ne 1 ]; then
+    echo "usage: deploy.sh version"
+    exit 1
+fi
+
+VERSION=${1}
+PROJECT_ID=sandbox-2501
+gcloud app deploy -q --project ${PROJECT_ID} --version ${VERSION} app.yaml
+

@@ -1,0 +1,58 @@
+runtime: python27
+api_version: 1
+threadsafe: yes
+instance_class: F4
+automatic_scaling:
+  min_idle_instances: 1
+  max_idle_instances: 3
+  max_pending_latency: 300ms
+
+service: default
+handlers:
+- url: /gaeadmin/.*
+  script: google.appengine.ext.admin.application
+  login: admin
+
+- url: /_ah/queue/deferred
+  script: google.appengine.ext.deferred.deferred.application
+  login: admin
+
+- url: /static/(.*)
+  static_files: static/\1
+  upload: static/.*
+  secure: optional
+  expiration: "10m"
+
+# Library
+libraries:
+- name: webapp2
+  version: "2.5.1"
+- name: jinja2
+  version: "2.6"
+- name: ssl
+  version: latest
+
+# Remote API
+builtins:
+- remote_api: on
+- deferred: on
+
+skip_files:
+- ^(.*/)?#.*#
+- ^(.*/)?.*~
+- ^(.*/)?\..*
+- .*\.db$
+- .*\.less$
+- .*\.pyc$
+- .*\.sh$
+- .*\.txt$
+- .*Thumbs.db
+- build/
+- node_modules/
+- _test/
+- api_spec
+- reverse-proxy
+- template/html/_lp/v1/_build/
+- rev-manifest.json
+- static/stats.json
+

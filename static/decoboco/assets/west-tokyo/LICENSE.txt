@@ -1,0 +1,9 @@
+rinkak DecoBoco Map
+https://www.rinkak.com/map3d/v2
+
+Copyright 2014 kabuku Inc.
+
+Map image tiles are copyrighted by OpenStreetMap License: Creative Commons BY-SA 2.0 (https://www.openstreetmap.org/copyright)
+
+Special Thanks
+All vertical datas are provided by GSI (http://portal.cyberjapan.jp/help/termsofuse.html)

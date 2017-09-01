@@ -1,0 +1,221 @@
+<!--
+/*
+ * Copyright 2017 Google Inc. All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+-->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Decoboco AR</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no,
+  minimum-scale=1.0, maximum-scale=1.0">
+    <style>
+        body {
+            font-family: monospace;
+            margin: 0;
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            height: 100vh;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        #info {
+            position: absolute;
+            left: 50%;
+            bottom: 0;
+            transform: translate(-50%, 0);
+            margin: 1em;
+            z-index: 10;
+            display: block;
+            width: 100%;
+            line-height: 2em;
+            text-align: center;
+        }
+
+        #info a,
+        #info .title {
+            padding: 0.4em 0.6em;
+            border-radius: 0.1em;
+        }
+
+        #info a {
+            color: rgba(255, 255, 255, 0.8);
+            background-color: rgba(40, 40, 40, 0.6);
+            font-weight: bold;
+            text-decoration: none;
+        }
+
+        .title {
+            color: rgba(255, 255, 255, 0.9);
+            background-color: rgba(40, 40, 40, 0.4);
+            margin-left: 0.2em;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="info">
+        <span class="title">Tap to spawn Decoboco MAP(West TOKYO)</span>
+    </div>
+    <script src="../common/js/three.r86.js"></script>
+    <script src="../common/js/VRControls.js"></script>
+    <script src="../common/js/MTLLoader.js"></script>
+    <script src="../common/js/OBJLoader.js"></script>
+    <script src="../common/js/three.ar.0.1.1.js"></script>
+    <script>
+        var container, stats;
+
+        var camera, scene, renderer;
+
+        var mouseX = 0, mouseY = 0;
+
+        var windowHalfX = window.innerWidth / 2;
+        var windowHalfY = window.innerHeight / 2;
+
+
+        init();
+        animate();
+
+
+        function init() {
+
+            container = document.createElement('div');
+            document.body.appendChild(container);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 2000);
+            camera.position.z = 250;
+
+            // scene
+
+            scene = new THREE.Scene();
+
+            var ambient = new THREE.AmbientLight(0xffffff, 0.15);
+            scene.add(ambient);
+
+            var directionalLight0 = new THREE.DirectionalLight(0xffffff, 0.7);
+            directionalLight0.position.set(0, 1, 1).normalize();
+            scene.add(directionalLight0);
+
+            var directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.3);
+            directionalLight1.position.set(0, 1, -1).normalize();
+            scene.add(directionalLight1);
+
+            // model
+
+            var onProgress = function (xhr) {
+                if (xhr.lengthComputable) {
+                    var percentComplete = xhr.loaded / xhr.total * 100;
+                    console.log(Math.round(percentComplete, 2) + '% downloaded');
+                }
+            };
+
+            var onError = function (xhr) { };
+
+            // THREE.Loader.Handlers.add(/\.dds$/i, new THREE.DDSLoader());
+
+            var mtlLoader = new THREE.MTLLoader();
+            mtlLoader.setPath('assets/west-tokyo/');
+            mtlLoader.load('mesh.mtl', function (materials) {
+
+                materials.preload();
+
+                var objLoader = new THREE.OBJLoader();
+                objLoader.setMaterials(materials);
+                objLoader.setPath('assets/west-tokyo/');
+                objLoader.load('mesh.obj', function (object) {
+
+                    //object.position.y;
+                    object.scale.x = 2;
+                    object.scale.y = 2;
+                    object.scale.z = 2;
+
+                    var helper = new THREE.BoundingBoxHelper(object);
+                    helper.geometry.computeBoundingBox();
+                    var bb = helper.geometry.boundingBox;
+                    console.log("obj.bb.x: " + bb.min.x + ", " + bb.max.x);
+                    console.log("obj.bb.y: " + bb.min.y + ", " + bb.max.y);
+                    console.log("obj.bb.z: " + bb.min.z + ", " + bb.max.z);
+                    scene.add(object);
+
+                }, onProgress, onError);
+
+            });
+
+            //
+
+            renderer = new THREE.WebGLRenderer();
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            container.appendChild(renderer.domElement);
+
+            document.addEventListener('mousemove', onDocumentMouseMove, false);
+
+            //
+
+            window.addEventListener('resize', onWindowResize, false);
+
+        }
+
+        function onWindowResize() {
+
+            windowHalfX = window.innerWidth / 2;
+            windowHalfY = window.innerHeight / 2;
+
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+
+            renderer.setSize(window.innerWidth, window.innerHeight);
+
+        }
+
+        function onDocumentMouseMove(event) {
+
+            mouseX = (event.clientX - windowHalfX) / 2;
+            mouseY = (event.clientY - windowHalfY) / 2;
+
+        }
+
+        //
+
+        function animate() {
+
+            requestAnimationFrame(animate);
+            render();
+
+        }
+
+        function render() {
+
+            camera.position.x += (mouseX - camera.position.x) * .05;
+            camera.position.y += (- mouseY - camera.position.y) * .05;
+
+            camera.lookAt(scene.position);
+
+            renderer.render(scene, camera);
+
+        }
+    </script>
+</body>
+
+</html>

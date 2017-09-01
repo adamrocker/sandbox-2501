@@ -1,0 +1,252 @@
+<!--
+/*
+ * Copyright 2017 Google Inc. All Rights Reserved.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+-->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Decoboco AR</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no,
+  minimum-scale=1.0, maximum-scale=1.0">
+    <style>
+        body {
+            font-family: monospace;
+            margin: 0;
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            height: 100vh;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        #info {
+            position: absolute;
+            left: 50%;
+            bottom: 0;
+            transform: translate(-50%, 0);
+            margin: 1em;
+            z-index: 10;
+            display: block;
+            width: 100%;
+            line-height: 2em;
+            text-align: center;
+        }
+
+        #info a,
+        #info .title {
+            padding: 0.4em 0.6em;
+            border-radius: 0.1em;
+        }
+
+        #info a {
+            color: rgba(255, 255, 255, 0.8);
+            background-color: rgba(40, 40, 40, 0.6);
+            font-weight: bold;
+            text-decoration: none;
+        }
+
+        .title {
+            color: rgba(255, 255, 255, 0.9);
+            background-color: rgba(40, 40, 40, 0.4);
+            margin-left: 0.2em;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <!--<div id="info">
+        <span class="title">Tap to spawn Decoboco MAP(West TOKYO)</span>
+    </div>-->
+    <script src="../common/js/three.r86.js"></script>
+    <script src="../common/js/VRControls.js"></script>
+    <script src="../common/js/MTLLoader.js"></script>
+    <script src="../common/js/OBJLoader.js"></script>
+    <script src="../common/js/three.ar.0.1.1.js"></script>
+    <script>
+        var vrDisplay;
+        var vrFrameData;
+        var vrControls;
+        var arView;
+        var canvas;
+        var camera;
+        var scene;
+        var renderer;
+        var map;
+        var isLoadedMap = false;
+        var isPlacedMap = false;
+        /**
+         * Use the `getARDisplay()` utility to leverage the WebVR API
+         * to see if there are any AR-capable WebVR VRDisplays. Returns
+         * a valid display if found. Otherwise, display the unsupported
+         * browser message.
+         */
+        THREE.ARUtils.getARDisplay().then(function (display) {
+            if (display) {
+                vrFrameData = new VRFrameData();
+                vrDisplay = display;
+                init();
+            } else {
+                THREE.ARUtils.displayUnsupportedMessage();
+            }
+        });
+
+        function _loadMap() {
+            var onProgress = function(xhr) {
+                if (xhr.lengthComputable) {
+                    var percentComplete = xhr.loaded / xhr.total * 100;
+                    console.log(Math.round(percentComplete, 2) + '% downloaded');
+                }
+            };
+
+            var onError = function(xhr) {  alert("ERROR: could not load data")  };
+
+            // load obj and mtl
+            var mtlLoader = new THREE.MTLLoader();
+				mtlLoader.setPath('./assets/west-tokyo/');
+				mtlLoader.load('mesh.mtl', function(materials) {
+					materials.preload();
+					var objLoader = new THREE.OBJLoader();
+					objLoader.setMaterials(materials);
+					objLoader.setPath('./assets/west-tokyo/');
+					objLoader.load('mesh.obj', function (object) {
+                        map = object.clone();
+                        map.scale.x = 0.02;
+                        map.scale.y = 0.02;
+                        map.scale.z = 0.02;
+                        isLoadedMap = true;
+                        var helper = new THREE.BoxHelper(map);
+                        helper.geometry.computeBoundingBox();
+                        var bb = helper.geometry.boundingBox;
+					}, onProgress, onError);
+				});
+        }
+
+        function init() {
+            // Turn on the debugging panel
+            var arDebug = new THREE.ARDebug(vrDisplay);
+            document.body.appendChild(arDebug.getElement());
+
+            // Setup the three.js rendering environment
+            renderer = new THREE.WebGLRenderer({ alpha: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            console.log('setRenderer size', window.innerWidth, window.innerHeight);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.autoClear = false;
+            canvas = renderer.domElement;
+            document.body.appendChild(canvas);
+            scene = new THREE.Scene();
+
+            // light
+            var ambient = new THREE.AmbientLight(0xffffff, 0.15);
+            scene.add(ambient);
+            var directionalLight0 = new THREE.DirectionalLight(0xffffff, 0.7);
+            directionalLight0.position.set(0, 1, 1).normalize();
+            scene.add(directionalLight0);
+            var directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.3);
+            directionalLight1.position.set(0, 1, -1).normalize();
+            scene.add(directionalLight1);
+
+            // Creating the ARView, which is the object that handles
+            // the rendering of the camera stream behind the three.js
+            // scene
+            arView = new THREE.ARView(vrDisplay, renderer);
+            // The ARPerspectiveCamera is very similar to THREE.PerspectiveCamera,
+            // except when using an AR-capable browser, the camera uses
+            // the projection matrix provided from the device, so that the
+            // perspective camera's depth planes and field of view matches
+            // the physical camera on the device.
+            camera = new THREE.ARPerspectiveCamera(
+                vrDisplay,
+                60,
+                window.innerWidth / window.innerHeight,
+                vrDisplay.depthNear,
+                vrDisplay.depthFar
+            );
+            // VRControls is a utility from three.js that applies the device's
+            // orientation/position to the perspective camera, keeping our
+            // real world and virtual world in sync.
+            vrControls = new THREE.VRControls(camera);
+            _loadMap();
+
+            // Bind our event handlers
+            window.addEventListener('resize', onWindowResize, false);
+            canvas.addEventListener('touchstart', onClick, false);
+            // Kick off the render loop!
+            update();
+        }
+        /**
+         * The render loop, called once per frame. Handles updating
+         * our scene and rendering.
+         */
+        function update() {
+            // Update our camera projection matrix in the event that
+            // the near or far planes have updated
+            camera.updateProjectionMatrix();
+            // From the WebVR API, populate `vrFrameData` with
+            // updated information for the frame
+            vrDisplay.getFrameData(vrFrameData);
+            // Update our perspective camera's positioning
+            vrControls.update();
+            // Render the device's camera stream on screen
+            arView.render();
+            // Render our three.js virtual scene
+            renderer.clearDepth();
+            renderer.render(scene, camera);
+            // Kick off the requestAnimationFrame to call this function
+            // on the next frame
+            requestAnimationFrame(update);
+        }
+        /**
+         * On window resize, update the perspective camera's aspect ratio,
+         * and call `updateProjectionMatrix` so that we can get the latest
+         * projection matrix provided from the device
+         */
+        function onWindowResize() {
+            console.log('setRenderer size', window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function onClick() {
+            if (!isLoadedMap) {
+                return;
+            }
+            if (isPlacedMap) {
+                return;
+            }
+            var hit = vrDisplay.hitTest(0.5, 0.5);
+            if (hit && hit.length > 0) {
+                var applyOrientation = true;
+                var easing = 0.25;
+                var clone = map.clone();
+                scene.add(clone);
+                THREE.ARUtils.placeObjectAtHit(clone, hit[0], applyOrientation, easing);
+                isPlacedMap = true;
+            }
+        }
+    </script>
+</body>
+
+</html>
